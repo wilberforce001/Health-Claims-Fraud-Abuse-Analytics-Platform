@@ -1,4 +1,5 @@
 # Ignore large datasets
+.env
 data/
 *.csv
 *.xlsx
