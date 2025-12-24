@@ -83,3 +83,25 @@ ax.set_xlabel("Allowed Services (log scale)")
 ax.set_ylabel("Avg Cost per Service")
 
 st.pyplot(fig)
+
+# Provider Risk View
+# - Identifies providers with abnormally expensive behavior
+# - Foundation for fraud flags
+
+st.header("High-Risk Providers")
+
+query = """
+SELECT
+p.provider_id,
+p.specialty,
+COUNT(*) AS total_claims,
+AVG(c.claim_amount) AS avg_claim
+FROM claims c
+JOIN providers p USING (provider_id)
+GROUP BY p.provider_id, p.specialty
+ORDER BY avg_claim DESC
+LIMIT 20;
+"""
+
+df_providers = get_data(query)
+st.dataframe(df_providers)
