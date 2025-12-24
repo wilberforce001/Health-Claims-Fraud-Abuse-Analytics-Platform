@@ -27,8 +27,9 @@ def get_data(query):
 st.title("Health Claims Fraud & Abuse Analytics")
 
 
-# BETOS Risk Distribution - shows immediate risk stratification
-# High-rik BETOS = abuse-prone services
+# BETOS Risk Distribution 
+# - Shows immediate risk stratification
+# - High-rik BETOS = abuse-prone services
 st.header("BETOS Risk Overview")
 
 query = """
@@ -45,5 +46,40 @@ ax.set_title("BETOS Complexity Scores")
 ax.set_xlabel("BETOS Group")
 ax.set_ylabel("Complexity Score")
 plt.xticks(rotation=90)
+
+st.pyplot(fig)
+
+# BETOS Cost vs Volume (Fraud Signal)
+# - Low volume + high cost - classic abuse risk. 
+# - A real CMS fraud detection heuristic
+
+st.header("BETOS Cost vs Volume")
+
+query = """
+SELECT betos_group,
+allowed_services,
+payment_amt,
+(payment_amt / allowed_services) AS avg_cost_per_service
+FROM betos_metrics
+ORDER BY avg_cost_per_service DESC;
+"""
+
+df_cost = get_data(query)
+
+fig, ax = plt.subplots()
+sns.scatterplot(
+    data=df_cost,
+    x="allowed_services",
+    y="avg_cost_per_service",
+    size="payment_amt",
+    sizes=(20, 50),
+    alpha=0.7,
+    ax=ax
+)
+
+ax.set_xscale("log")
+ax.set_title("Cost vs Volume (Fraud Lens)")
+ax.set_xlabel("Allowed Services (log scale)")
+ax.set_ylabel("Avg Cost per Service")
 
 st.pyplot(fig)
