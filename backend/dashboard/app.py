@@ -25,3 +25,25 @@ def get_data(query):
     return df
 
 st.title("Health Claims Fraud & Abuse Analytics")
+
+
+# BETOS Risk Distribution - shows immediate risk stratification
+# High-rik BETOS = abuse-prone services
+st.header("BETOS Risk Overview")
+
+query = """
+SELECT betos_group, complexity_score
+FROM betos_complexity
+ORDER BY complexity_score DESC;
+"""
+
+df_betos = get_data(query)
+
+fig, ax = plt.subplots()
+sns.barplot(data=df_betos, x="betos_group", y="complexity_score", ax=ax)
+ax.set_title("BETOS Complexity Scores")
+ax.set_xlabel("BETOS Group")
+ax.set_ylabel("Complexity Score")
+plt.xticks(rotation=90)
+
+st.pyplot(fig)
