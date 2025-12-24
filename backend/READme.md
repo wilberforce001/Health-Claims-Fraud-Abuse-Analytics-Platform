@@ -297,8 +297,25 @@ SELECT * FROM fraud_summary ORDER BY severity_score DESC;
 
 ![Fraud analytics output](images/fraud_analytics_output.png)
 
+# Visual Dashboard
+We now build a dashboard that provide visuals that help in answering the following questions:
+1. Which **BETOS groups are highest risk**?
+2. Which **CPT codes** are linked to high complexity?
+3. Which **providers** overuse high-risk services?
+4. Where are **outliers** (high cost, high frequency)? 
 
+## Installation of the required dashboard packages
+pip install streamlit pandas psycopg2-binary matplotlib seaborn
 
+**Streamlit**: An open-source framework that allows you to quickly turn data scripts into interactive web applications and dashboards using only Python.
+
+**Pandas**: The standard tool for data manipulation and analysis; it provides high-performance data structures like "DataFrames" for handling tabular, labeled data (similar to Excel or SQL tables).
+
+**Psycopg2-binary**: A PostgreSQL database adapter for Python; the "binary" version is a pre-compiled package that allows you to connect to and query PostgreSQL databases without needing to install complex C-dependencies manually.
+
+**Matplotlib**: A comprehensive library for creating static, animated, and interactive visualizations; it serves as the foundational plotting engine for many other Python tools.
+
+**Seaborn**: A high-level statistical data visualization library built on top of Matplotlib; it provides a more user-friendly interface for drawing attractive and informative statistical graphics. 
 
 
 
