@@ -15,7 +15,7 @@ The model can be used by:
 ## Data Sources
 
 Medicare Part B National Summary Data (CY 2024)
-Source: CMS (https://catalog.data.gov/dataset/medicare-physician-other-practitioners-by-provider-and-service-b156e/resource/c96c16c3-a4f6-46a9-80cc-16a0bc803153)
+Source: CMS (https://catalog.data.gov/dataset/medicare-physician-other-practitioners-by-provider-and-service-b156e?utm_source=chatgpt.com)
 
 Due to size constraints, raw datasets are not included in this repository.
 Download the dataset and place it in the `/data` directory before running ingestion.
@@ -316,6 +316,161 @@ pip install streamlit pandas psycopg2-binary matplotlib seaborn
 **Matplotlib**: A comprehensive library for creating static, animated, and interactive visualizations; it serves as the foundational plotting engine for many other Python tools.
 
 **Seaborn**: A high-level statistical data visualization library built on top of Matplotlib; it provides a more user-friendly interface for drawing attractive and informative statistical graphics. 
+
+This **Visual dashboard** is:
+- A real healthcare fraud dashboard
+- Based on Medicare Part B + BETOS data
+- Uses industry fraud logic
+- Provides visual evidence
+
+# Risk Intelligence
+Having done end-to-end analytics - database dashboard, we now move from descriptive analytics to **risk intelligence**. We need to implement 4 layers as follows:
+- CPT-level complexity & abuse signals
+- Provider behaviour deviation (peer comparison)
+- Composite fraud risk score
+- Explainability & flags (Why someone is risky)
+
+## CPT-Level Complexity and Risk View
+Here we translate BETOS group risk to individual CPT codes because claims are billed in CPTs and CPT patterns are flagged by investigators. 
+
+Conceptually, **BETOS** represent **service category** and **CPT** stand for **actual billing code**. Therefore, we have to Map CPT to BETOS, Inherit BETOS complexity and Aggregate CPT behavior. 
+
+Step 1A: Confirm the existence of CPT --> BETOS mapping
+
+SELECT * FROM betos_codes LIMIT 10;
+
+![CPT → BETOS Mapping](images/cpt_betos_mapping.png)
+
+Step 1B: Create a CPT --> BETOS mapping table
+
+So far in the pipeline, we have the following complete;
+- Claims fact table
+- CPT codes
+- BETOS risk logic
+
+However, we do not have the following;
+- CPT --> BETOS mapping - missing 
+- Risk views - blocked
+
+We must therefore build a CPT --> BETOS mapping table
+
+Step 1: Create the Taxonomy table
+
+CREATE TABLE rbcs_taxonomy (
+  hcpcs_cd TEXT PRIMARY KEY,
+  rbcs_id TEXT,
+  rbcs_cat TEXT,
+  rbcs_cat_desc TEXT,
+  rbcs_subcat TEXT,
+  rbcs_subcat_desc TEXT,
+  rbcs_family_desc TEXT,
+  rbcs_major_ind TEXT
+);
+
+We first ingest RBCS crosswalk into Postgres then populate the table. 
+
+Step 2: Validate the join works
+
+SELECT COUNT(*) FROM rbcs_taxonomy;
+
+SELECT *
+FROM rbcs_taxonomy
+LIMIT 5;
+
+![RBCS Taxonomy](images/join_test.png)
+
+RBCS CMS Taxonomy Table
+![RBCS Taxonomy Table](images/rbcs_taxonomy_table.png)
+
+Step 3: Test the join
+
+SELECT c.cpt_code, r.rbcs_id
+FROM claims c
+JOIN rbcs_taxonomy r
+  ON c.cpt_code = r.hcpcs_cd
+LIMIT 10;
+
+![Test join](images/join_test.png)
+
+The above confirms a completion of the data model with correct CPT/HCPCS alignment and the existence of coverage across E&M, Imaging, Procedures and Labs. We now have;
+- Claims (FACT, 35k rows)
+- rbcs_taxonomy (DIM, CMS official)
+- classification key (rbcs_id)
+
+## Definition of complexity and risk logic
+We need to know which RBCS groups are low, medium and high risk. We therefore need to create rbcs_complexity table. 
+
+CREATE TABLE rbcs_complexity (
+  rbcs_id TEXT PRIMARY KEY,
+  complexity_score INT,
+  risk_level TEXT
+);
+
+## Populate rbcs_complexity table
+Heuristic logic:
+- Tests / labs → lower risk
+- E&M / procedures → higher risk
+- Major procedures (rbcs_major_ind = 'Y') → highest risk
+
+INSERT INTO rbcs_complexity (rbcs_id, complexity_score, risk_level)
+SELECT DISTINCT
+  r.rbcs_id,
+  CASE
+    WHEN r.rbcs_cat = 'T' THEN 1
+    WHEN r.rbcs_cat = 'I' THEN 2
+    WHEN r.rbcs_cat = 'E' THEN 3
+    WHEN r.rbcs_cat = 'R' THEN 4
+    ELSE 2
+  END AS complexity_score,
+  CASE
+    WHEN r.rbcs_cat = 'T' THEN 'Very Low'
+    WHEN r.rbcs_cat = 'I' THEN 'Low'
+    WHEN r.rbcs_cat = 'E' THEN 'Medium'
+    WHEN r.rbcs_cat = 'R' THEN 'High'
+    ELSE 'Low'
+  END AS risk_level
+FROM rbcs_taxonomy r;
+
+## Build CPT risk view
+
+CREATE OR REPLACE VIEW cpt_complexity_view AS
+SELECT
+  c.cpt_code,
+  r.rbcs_id,
+  r.rbcs_cat_desc,
+  rc.complexity_score,
+  rc.risk_level,
+  COUNT(*) AS total_claims,
+  AVG(c.claim_amount) AS avg_claim_amount
+FROM claims c
+JOIN rbcs_taxonomy r
+  ON c.cpt_code = r.hcpcs_cd
+JOIN rbcs_complexity rc
+  ON r.rbcs_id = rc.rbcs_id
+GROUP BY
+  c.cpt_code,
+  r.rbcs_id,
+  r.rbcs_cat_desc,
+  rc.complexity_score,
+  rc.risk_level;
+
+## Run Validation query
+
+SELECT *
+FROM cpt_complexity_view
+ORDER BY complexity_score DESC, avg_claim_amount DESC
+LIMIT 20;
+
+
+## CPT Complexity View
+The table below is a result of the modelling of Medicare Part B claims joined with CMS’s Restructured BETOS (RBCS) taxonomy, and derived procedure-level fraud risk using complexity heuristics.
+
+
+![CPT Complexity View](images/cpt_complexity_view.png)
+
+
+
+
 
 
 
