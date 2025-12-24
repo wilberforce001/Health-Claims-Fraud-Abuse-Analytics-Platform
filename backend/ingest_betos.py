@@ -29,11 +29,18 @@ print("Detected columns:", df.columns.tolist())
 # Rename columns to match your DB table
 df = df.rename(columns={
     "BETOS": "betos_group",
-    "Allowed Services": "betos_description"
+    "Allowed Services": "allowed_services",
+    "Allowed Charges": "allowed_charges",
+    "Payment Amt": "payment_amt"
 })
 
 # Keep only relevant columns
-df = df[["betos_group", "betos_description"]]
+df = df[["betos_group", "allowed_services", "allowed_charges", "payment_amt"]]
+
+# Ensure numeric types
+numeric_cols = ["allowed_services", "allowed_charges", "payment_amt"]
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors="coerce")
 
 # Remove empty rows
 df = df.dropna(subset=["betos_group"])
@@ -55,8 +62,8 @@ cur = conn.cursor()
 
 # Insert SQL
 insert_sql = """
-INSERT INTO betos_codes (betos_group, betos_description)
-VALUES (%s, %s)
+INSERT INTO public.betos_metrics (betos_group, allowed_services, allowed_charges, payment_amt)
+VALUES (%s, %s, %s, %s)
 ON CONFLICT (betos_group) DO NOTHING;
 """
 
@@ -65,7 +72,15 @@ for row in df.itertuples(index=False):
     cur.execute(insert_sql, row)
 
 conn.commit()
+
+cur.execute("SELECT COUNT(*) FROM public.betos_metrics;")
+print(cur.fetchone())
+
 cur.close()
 conn.close()
 
+
 print("BETOS codes ingested successfully ✅.")
+
+
+
