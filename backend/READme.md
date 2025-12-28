@@ -469,8 +469,166 @@ The table below is a result of the modelling of Medicare Part B claims joined wi
 ![CPT Complexity View](images/cpt_complexity_view.png)
 
 
+## Provider-level Fraud Risk
+Having identified risky CPTs we now need to identify providers abusing risky CPTs which is the center of actual fraud detection.
 
+### Provider behavior deviation (Core Fraud Logic)
+We need to flag providers who over-utilize high-complexity CPTs compared to their peers in specialty.
 
+### Provider CPT Usage 
+Create  provider behavior view:
+
+CREATE OR REPLACE VIEW provider_cpt_usage AS
+SELECT
+  p.provider_id,
+  p.specialty,
+  c.cpt_code,
+  COUNT(*) AS usage_count
+FROM claims c
+JOIN providers p USING (provider_id)
+GROUP BY p.provider_id, p.specialty, c.cpt_code;
+
+![Provider Behavior View](images/provider_behavior_view.png)
+
+Validate
+
+SELECT * FROM provider_cpt_usage LIMIT 10;
+
+### Specialty peer baseline
+This is to define normal behavior
+
+CREATE OR REPLACE VIEW specialty_cpt_baseline AS
+SELECT
+  specialty,
+  cpt_code,
+  AVG(usage_count) AS avg_usage
+FROM provider_cpt_usage
+GROUP BY specialty, cpt_code;
+
+### Provider deviation score
+This is what provides fraud signal
+
+CREATE OR REPLACE VIEW provider_deviation AS
+SELECT
+  u.provider_id,
+  u.specialty,
+  u.cpt_code,
+  u.usage_count,
+  b.avg_usage,
+  (u.usage_count - b.avg_usage) AS deviation
+FROM provider_cpt_usage u
+JOIN specialty_cpt_baseline b
+  ON u.specialty = b.specialty
+ AND u.cpt_code = b.cpt_code;
+
+Validate high deviations
+
+SELECT *
+FROM provider_deviation
+ORDER BY deviation DESC
+LIMIT 10;
+
+![Behavioral Outliers](images/behavioral_outliers.png)
+
+## Composite Fraud Risk Score
+Using Actuarial logic, we now weight behavior by complexity
+
+Fraud Risk = Deviation x complexity score
+
+### Provider fraud score
+
+CREATE OR REPLACE VIEW provider_fraud_score AS
+SELECT
+  d.provider_id,
+  SUM(
+    d.deviation * c.complexity_score
+  ) AS fraud_risk_score
+FROM provider_deviation d
+JOIN cpt_complexity_view c
+  ON d.cpt_code = c.cpt_code
+GROUP BY d.provider_id;
+
+### Inspect top risk providers
+
+SELECT *
+FROM provider_fraud_score
+ORDER BY fraud_risk_score DESC
+LIMIT 10;
+
+![Top Risk Providers](images/top_risk_providers.png)
+
+We have so far worked on CPT-level complexity, provider deviation from peers and composite provider fraud score which answers the "Who looks risky?". However, we would to ask "Why are they risky?" We therefore go to **Fraud Explainability**. This separates black-box scoring from acrionable fraud analytics. 
+
+## Fraud Explainability 
+For each high-risk provider, we want to explain:
+- Which CPTs caused the risk
+- The abnormality in their behavior
+- The complexity / riskiness of the CPTs
+
+### Fraud Explainability Conceptul Model
+We will decompose the fraud score as follows:
+- Provider risk:
+- - CPT A (high complexity, overused)
+- - CPT B (moderate complexity, overused)
+- - CPT C (normal - ignored)
+
+### Create provider fraud explanation view
+
+CREATE OR REPLACE VIEW provider_fraud_explanation AS
+SELECT
+  d.provider_id,
+  d.specialty,
+  d.cpt_code,
+  d.usage_count,
+  d.avg_usage,
+  d.deviation,
+  c.complexity_score,
+  c.risk_level,
+  (d.deviation * c.complexity_score) AS risk_contribution
+FROM provider_deviation d
+JOIN cpt_complexity_view c
+  ON d.cpt_code = c.cpt_code
+WHERE d.deviation > 0;
+
+The above view shows, for every provider:
+- Which CPTs they overuse
+- How risky those CPTs are
+- How much each CPT contributes to fraud risk
+
+Validation of the explanation layer
+
+SELECT *
+FROM provider_fraud_explanation
+ORDER BY risk_contribution DESC
+LIMIT 20;
+
+## Provider Fraud Flags
+We now need to translate analytics to flags and clear fraud flags are as defined below:
+
+| Rule            |  Flag  |   |   |   |
+|---|---|---|---|---|
+|  Risk score > 90th percentile | HIGH RISK | 
+|  >= 2 high-complexity CPTs overused |  PATTERN ABUSE  |   
+|  Extreme deviation on one CPT | SPIKE ABUSE   | 
+
+### Create fraud flag view
+
+CREATE OR REPLACE VIEW provider_fraud_flags AS
+SELECT
+  provider_id,
+  CASE
+    WHEN SUM(risk_contribution) > 100 THEN 'HIGH_RISK'
+    WHEN SUM(risk_contribution) BETWEEN 40 AND 100 THEN 'MEDIUM_RISK'
+    ELSE 'LOW_RISK'
+  END AS fraud_flag
+FROM provider_fraud_explanation
+GROUP BY provider_id;
+
+Validate
+
+SELECT *
+FROM provider_fraud_flags
+ORDER BY fraud_flag DESC;
 
 
 
