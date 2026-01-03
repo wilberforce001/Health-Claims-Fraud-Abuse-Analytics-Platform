@@ -630,6 +630,16 @@ SELECT *
 FROM provider_fraud_flags
 ORDER BY fraud_flag DESC;
 
+## Add 3 core analytics endpoints
+
+| Endpoint  | Purpose  |   |   |   |
+|---|---|---|---|---|
+| /cpt/complexity | CPT-level risk & complexity  | 
+| /risk/providers  | Provider fraud risk ranking |   
+| /risk/explanations  | Why a provider is risky | 
+|
+
+
 
 
 
