@@ -23,3 +23,13 @@ def cpt_complexity(min_score: int = 3, limit: int = 50):
         """), {"min_score": min_score, "limit": limit})
 
         return [dict(row._mapping) for row in result]
+    
+    total = db.execute(text("""
+SELECT COUNT (*) FROM cpt_complexity_view
+WHERE complexity_score >= :min_complexity
+"""), {"min_complexity": min_complexity}).scalar()
+    
+    return {
+        "total": total,
+        "items": result.mappings().all()
+    }
