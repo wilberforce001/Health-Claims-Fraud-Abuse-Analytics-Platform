@@ -647,7 +647,6 @@ This inovolved an implementation of paginated analytics endpoints using typed Py
 ## Filters
 We use filters to turn demo to real data analytics service. For providers we have; specialty (peer grouping) and min_avg_complexity. For CPT we have risk_level and rbcs_category. 
 
-### Provider filters
 
 
 
