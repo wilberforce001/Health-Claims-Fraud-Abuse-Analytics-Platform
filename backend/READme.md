@@ -647,11 +647,79 @@ This inovolved an implementation of paginated analytics endpoints using typed Py
 ## Filters
 We use filters to turn demo to real data analytics service. For providers we have; specialty (peer grouping) and min_avg_complexity. For CPT we have risk_level and rbcs_category. 
 
+# Fraud Analytics & Risk Modeling 
+Here, the aim is to turn the system from analytics views into statistically defensible fraud risk scoring with explainability. Everything here will be about comparisons, distributions and deviations. This will ensure that:
+- There are non-zero fraud scores
+- Peer-group baselines (by specialty)
+- Statistical outlier detection
+- A first ML risk model (interpretable)
 
+## Definition of Peer Groups 
+What is a peer group? These are providers with:
+- Same specialty
+- Similar clinical complexity exposure  
+This avoids false flags. 
 
+## Create Peer Baseline View
+- We start with utilization behavior which help understand that for every provider we can ask:
+- Are they above average?
+- How many standard deviations away?
 
+## Z-zcore Calculation (Non-zero scores)
+In this fraud model, we have 2 orthogonal fraud dimensions as follows:
+- claims_zscore - does this provider bill far more than peers?
+- deviation_zscore - does this provider diviate abnormally from CPT norms?
 
+The above dimensions help avoid classic fraud-model mistakes like:
+- Unfairly penalizing high-volume specialists and 
+- Confusing complexity with behavior
 
+## Composite risk score
+This gives:
+- One sortable composite score which is fully explainable and perfect for /providers/high-risk
+
+### Meaning of the Z-scores
+0 - normal  
+1 - 2: slightly high  
+2 - 3: suspicious  
+> 3: Strong outlier
+
+## Fraud risk score
+This is for the conversion stats to single score
+
+## Fraud risk tiers and their interpretation
+Critical (≥ 3σ): extreme outlier - likely fraud  
+High (≥ 2σ): strong anomaly - review required  
+Medium (≥ 1σ): mild deviation - monitor  
+Low (< 1σ): normal peer behavior
+
+## Fixing Raw z-scores which are too dominant
+### Cap z-scores ( cap at -+5 (industry standard))
+
+### Standardize Z-score logic
+For each provider within a peer group:
+
+z = provider_usage - peer_mean / peer_std
+
+### Rules to enforce
+Ignore peer groups with very small n (e.g. < 5>)  
+Handle std = 0 safely  
+Keep directional meaning (high usage = higher risk)
+
+### Convert Z-scores to risk contribution
+risk_score = min(1.0, abs(z-score) / 5.0)  
+ or logistic:  
+ 
+ risk = 1/ (1+e^-z)
+
+ ### Aggregate provider risk
+ Weighted sum: provider_risk = Σ (cpt_risk * complexity_weight * usage_weight)
+
+ ### Percentile-Group (Percentile & Rank)
+ For each provider within a peer group (same specialty + CPT):  
+ How abnormal are they relative to peers?  
+ What percentile are they in?  
+ What is their rank? 
 
 
 
