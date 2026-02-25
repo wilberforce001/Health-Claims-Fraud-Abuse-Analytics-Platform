@@ -721,7 +721,26 @@ risk_score = min(1.0, abs(z-score) / 5.0)
  What percentile are they in?  
  What is their rank? 
 
+ ### Provider-Level Risk Aggregation
+ The goal here is to turn many CPT-level risk signals into ONE provider risk score (0-100) + explainable components. We therefore, need to:  
+ 1. Aggregate CPT rsik per provider
+ 2. Weight by complexity plus usage
+ 3. Normalize to interpretable scale
+ 4. Store in a clean summary view 
 
+### Conceptual Model
+For each provider:  
+
+Provider Risk = Sum(risk_contribution x complexity_weight x usage_weight)  
+
+Where:  
+- risk_contribution - from peer comparison
+- complexity_weight - from RBCS complexity
+- usage_weight - log-scaled usage
+
+This prevents:  
+- The domination of small CPT spikes
+- Low-complexity codes inflating risk
 
 
 
