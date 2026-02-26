@@ -745,3 +745,17 @@ This prevents:
 
 
 
+# TO DO
+Now we can evolve this into something more advanced, such as:
+
+Rewriting generator to label fraud providers explicitly and calculate precision/recall numerically
+
+Adding supervised classification layer
+
+Adding specialty-based peer grouping
+
+Injecting subtle fraud instead of obvious volume inflation
+
+Introducing concept drift simulation
+
+Converting this into a dashboard-ready scoring table
