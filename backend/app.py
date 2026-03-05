@@ -4,10 +4,11 @@ import psycopg2
 import pandas as pd
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
-
+import plotly.graph_objects as go
 plt.style.use("seaborn-v0_8-darkgrid")
 
 st.set_page_config(page_title="Health Claims Fraud Dashboard", layout="wide")
+
 
 # PAGE STYLE
 st.markdown("""
@@ -19,6 +20,7 @@ st.markdown("""
 
 st.title("🚨 Health Claims Fraud & Abuse Analytics Platform")
 st.caption("Advanced Risk Intelligence Dashboard")
+
 
 # DATABASE CONNECTION
 load_dotenv()
@@ -52,11 +54,25 @@ spec_df = pd.read_sql("""
     GROUP BY specialty
 """, conn)
 
+
 # LOAD PROVIDER LIST
 provider_list = pd.read_sql("""
     SELECT DISTINCT provider_id
     FROM provider_risk_tier ORDER BY provider_id
 """, conn)
+
+
+top_risk_df = pd.read_sql("""
+    SELECT
+        provider_id,
+        specialty,
+        claims_peer_z
+    FROM provider_risk_tier
+    WHERE risk_tier = 'High'
+    ORDER BY claims_peer_z DESC
+    LIMIT 10
+""", conn)
+
 
 # SIDEBAR FILTERS
 st.sidebar.header("Dashboard Filters")
@@ -67,11 +83,13 @@ risk_filter = st.sidebar.multiselect(
     default=["High", "Medium", "Low"]
 )
 
+
 # PROVIDER SEARCH
 provider_search = st.sidebar.selectbox(
     "Search Provider ID",
     options=["All Providers"] + provider_list["provider_id"].astype(str).tolist()
 )
+
 
 # PROVIDER PROFILE DATA
 provider_profile = None
@@ -97,6 +115,20 @@ if provider_search != "All Providers":
         WHERE r.provider_id = '{provider_search}'
     """, conn)
 
+
+# FRAUD SCORE QUERY
+fraud_score_df = None
+
+if provider_search != "All Providers":
+    fraud_score_df = pd.read_sql(f"""
+        SELECT
+            provider_id,
+            claims_peer_z
+        FROM provider_risk_tier
+        WHERE provider_id = '{provider_search}'
+    """, conn)
+
+
 # KPI METRICS
 col1, col2, col3 = st.columns(3)
 
@@ -109,6 +141,7 @@ col2.metric("🟠 Medium Risk Providers", int(medium_count))
 col3.metric("🟢 Low Risk Providers", int(low_count))
 
 st.divider()
+
 
 # PROVIDER RISK PROFILE PANEL
 if provider_profile is not None and not provider_profile.empty:
@@ -155,6 +188,33 @@ if provider_profile is not None and not provider_profile.empty:
         profile["specialty"]
     )
 
+
+# FRAUD RISK GAUGE
+if fraud_score_df is not None and not fraud_score_df.empty:
+
+    fraud_score = fraud_score_df.iloc[0]["claims_peer_z"]
+
+    st.subheader("🚨 Fraud Risk Gauge")
+
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=fraud_score,
+        title={"text": "Fraud Risk Score (Peer Z-Score)"},
+        gauge={
+            "axis": {"range": [-6, 6]},
+            "bar": {"color": "red"},
+            "steps": [
+                {"range": [-3, 0], "color": "#2ca02c"},   # Low
+                {"range": [0, 2], "color": "#ffdd57"},    # Medium
+                {"range": [2, 4], "color": "#ff7f0e"},    # High
+                {"range": [4, 6], "color": "#d62728"}     # Extreme
+            ],
+        }
+    ))
+
+    st.plotly_chart(fig_gauge, use_container_width=True)
+
+
 # RISK TIER BAR CHART
 st.subheader("Provider Risk Tier Distribution")
 
@@ -199,6 +259,7 @@ st.pyplot(fig1)
 
 st.divider()
 
+
 # PEER Z-SCORE DISTRIBUTION
 st.subheader("Peer Claims Z-Score Distribution")
 
@@ -210,6 +271,7 @@ ax2.hist(
     edgecolor="black",
     alpha=0.75
 )
+
 
 # Threshold line (Z = 3)
 ax2.axvline(3, color="red", linestyle="--", linewidth=2)
@@ -225,6 +287,7 @@ plt.tight_layout()
 st.pyplot(fig2)
 
 st.divider()
+
 
 # TEMPORAL SPIKE DISTRIBUTION
 st.subheader("Temporal Spike Risk Distribution")
@@ -252,6 +315,7 @@ st.pyplot(fig3)
 
 st.divider()
 
+
 # AVG CLAIM BY SPECIALTY
 st.subheader("Average Claim Amount by Specialty")
 
@@ -272,6 +336,42 @@ plt.tight_layout()
 st.pyplot(fig4)
 
 st.divider()
+
+
+# CHART SECTION
+st.divider()
+st.subheader("🚨 Top 10 Riskiest Providers")
+
+top_risk_df = top_risk_df.sort_values("claims_peer_z")
+
+fig5, ax5 = plt.subplots(figsize=(8,5))
+
+bars = ax5.barh(
+    top_risk_df["provider_id"].astype(str),
+    top_risk_df["claims_peer_z"],
+    color="#d62728"
+)
+
+for bar in bars:
+    width = bar.get_width()
+    ax5.text(
+        width,
+        bar.get_y() + bar.get_height()/2,
+        f"{width:.2f}",
+        va="center",
+        fontweight="bold"
+    )
+
+ax5.set_xlabel("Peer Claims Z-Score")
+ax5.set_ylabel("Provider ID")
+ax5.set_title("Top 10 Riskiest Providers", fontweight="bold")
+
+ax5.spines["top"].set_visible(False)
+ax5.spines["right"].set_visible(False)
+
+plt.tight_layout()
+st.pyplot(fig5)
+
 
 # HIGH RISK TABLE
 st.subheader("🔴 High Risk Providers Detail")
