@@ -73,6 +73,30 @@ provider_search = st.sidebar.selectbox(
     options=["All Providers"] + provider_list["provider_id"].astype(str).tolist()
 )
 
+# PROVIDER PROFILE DATA
+provider_profile = None
+
+if provider_search != "All Providers":
+    provider_profile = pd.read_sql(f"""
+        SELECT 
+            p.provider_id,
+            p.specialty,
+            r.risk_tier,
+            pr.claims_peer_z,
+            sr.max_spike_risk,
+            s.avg_claim_amount
+        FROM provider_risk_tier r
+        LEFT JOIN provider_peer_risk pr
+            ON r.provider_id = pr.provider_id
+        LEFT JOIN provider_spike_risk_score sr
+            ON r.provider_id = sr.provider_id
+        LEFT JOIN provider_summary s
+            ON r.provider_id = s.provider_id
+        LEFT JOIN provider_summary p
+            ON r.provider_id = p.provider_id
+        WHERE r.provider_id = '{provider_search}'
+    """, conn)
+
 # KPI METRICS
 col1, col2, col3 = st.columns(3)
 
@@ -85,6 +109,51 @@ col2.metric("🟠 Medium Risk Providers", int(medium_count))
 col3.metric("🟢 Low Risk Providers", int(low_count))
 
 st.divider()
+
+# PROVIDER RISK PROFILE PANEL
+if provider_profile is not None and not provider_profile.empty:
+
+    st.divider()
+    st.subheader("🔎 Provider Risk Profile")
+
+    profile = provider_profile.iloc[0]
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "Provider ID",
+        profile["provider_id"]
+    )
+
+    col2.metric(
+        "Risk Tier",
+        profile["risk_tier"]
+    )
+
+    col3.metric(
+        "Peer Z-Score",
+        round(profile["claims_peer_z"], 2)
+        if pd.notnull(profile["claims_peer_z"]) else "N/A"
+    )
+
+    col4.metric(
+        "Temporal Spike",
+        round(profile["max_spike_risk"], 2)
+        if pd.notnull(profile["max_spike_risk"]) else "N/A"
+    )
+
+    col5, col6 = st.columns(2)
+
+    col5.metric(
+        "Average Claim Amount",
+        f"${profile['avg_claim_amount']:,.2f}"
+        if pd.notnull(profile["avg_claim_amount"]) else "N/A"
+    )
+
+    col6.metric(
+        "Specialty",
+        profile["specialty"]
+    )
 
 # RISK TIER BAR CHART
 st.subheader("Provider Risk Tier Distribution")
@@ -221,5 +290,3 @@ query += " ORDER BY claims_peer_z DESC"
 high_risk_df = pd.read_sql(query, conn)
 
 st.dataframe(high_risk_df, use_container_width=True)
-
-conn.close()
