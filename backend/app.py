@@ -57,8 +57,9 @@ spec_df = pd.read_sql("""
 
 # LOAD PROVIDER LIST
 provider_list = pd.read_sql("""
-    SELECT DISTINCT provider_id
-    FROM provider_risk_tier ORDER BY provider_id
+SELECT provider_id, specialty
+FROM providers
+ORDER BY provider_id
 """, conn)
 
 
@@ -87,7 +88,7 @@ risk_filter = st.sidebar.multiselect(
 # PROVIDER SEARCH
 provider_search = st.sidebar.selectbox(
     "Search Provider ID",
-    options=["All Providers"] + provider_list["provider_id"].astype(str).tolist()
+    ["All Providers"] + provider_list["provider_id"].astype(str).tolist()
 )
 
 
@@ -118,7 +119,6 @@ if provider_search != "All Providers":
 
 # FRAUD SCORE QUERY
 fraud_score_df = None
-
 if provider_search != "All Providers":
     fraud_score_df = pd.read_sql(f"""
         SELECT
@@ -338,11 +338,48 @@ st.pyplot(fig4)
 st.divider()
 
 
-# CHART SECTION
+# LIST OF SPECIALTIES
+specialty_query = """
+SELECT DISTINCT specialty
+FROM provider_summary
+ORDER BY specialty;
+"""
+
+specialties = pd.read_sql(specialty_query, conn)
+
+specialty_list = specialties["specialty"].tolist()
+
+selected_specialty = st.sidebar.selectbox(
+    "Select Provider Specialty",
+    ["All"] + specialty_list
+)
+
+
+# PROVIDER FILTERS
+if selected_specialty == "All":
+    provider_query = """
+    SELECT r.provider_id, r.risk_tier, r.claims_peer_z, s.specialty
+    FROM provider_risk_tier r
+    JOIN provider_summary s
+    ON r.provider_id = s.provider_id
+    """
+else:
+    provider_query = f"""
+    SELECT r.provider_id, r.risk_tier, r.claims_peer_z, s.specialty
+    FROM provider_risk_tier r
+    JOIN provider_summary s
+    ON r.provider_id = s.provider_id
+    WHERE s.specialty = '{selected_specialty}'
+    """
+
+provider_df = pd.read_sql(provider_query, conn)
+
+
+# TOP 10 PROVIDERS CHART
 st.divider()
 st.subheader("🚨 Top 10 Riskiest Providers")
 
-top_risk_df = top_risk_df.sort_values("claims_peer_z")
+top_risk_df = top_risk_df.sort_values("claims_peer_z", ascending=False).head(10)
 
 fig5, ax5 = plt.subplots(figsize=(8,5))
 
@@ -353,14 +390,8 @@ bars = ax5.barh(
 )
 
 for bar in bars:
-    width = bar.get_width()
-    ax5.text(
-        width,
-        bar.get_y() + bar.get_height()/2,
-        f"{width:.2f}",
-        va="center",
-        fontweight="bold"
-    )
+    ax5.text(bar.get_width(), bar.get_y() + bar.get_height()/2,
+             f"{bar.get_width():.2f}", va='center', fontweight='bold')
 
 ax5.set_xlabel("Peer Claims Z-Score")
 ax5.set_ylabel("Provider ID")
