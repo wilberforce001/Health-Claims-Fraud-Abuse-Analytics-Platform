@@ -31,11 +31,15 @@ openpyxl==3.1.5
 packaging==25.0
 pandas==2.3.3
 pillow==12.0.0
+plotly==6.5.2
 protobuf==6.33.2
+psycopg==3.3.2
+psycopg-binary==3.3.2
 psycopg2==2.9.11
 psycopg2-binary==2.9.11
 pyarrow==22.0.0
 pydantic==2.12.5
+pydantic-settings==2.12.0
 pydantic_core==2.41.5
 pydeck==0.9.1
 pyparsing==3.3.1
