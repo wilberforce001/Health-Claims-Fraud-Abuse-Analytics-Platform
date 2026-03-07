@@ -85,7 +85,7 @@ risk_filter = st.sidebar.multiselect(
 )
 
 
-# PROVIDER SEARCH
+# PROVIDER SEARCH DROPDOWN (SIDEBAR)
 provider_search = st.sidebar.selectbox(
     "Search Provider ID",
     ["All Providers"] + provider_list["provider_id"].astype(str).tolist()
@@ -138,7 +138,7 @@ low_count = risk_summary.loc[risk_summary['risk_tier']=='Low','count'].sum()
 
 col1.metric("🔴 High Risk Providers", int(high_count))
 col2.metric("🟠 Medium Risk Providers", int(medium_count))
-col3.metric("🟢 Low Risk Providers", int(low_count))
+col3.metric("🟢 Low Risk Pr oviders", int(low_count))
 
 st.divider()
 
@@ -213,6 +213,60 @@ if fraud_score_df is not None and not fraud_score_df.empty:
     ))
 
     st.plotly_chart(fig_gauge, use_container_width=True)
+
+
+
+# FRAUD RISK EXPLAINABILITY
+if provider_search != "All Providers":
+
+    explain_query = f"""
+    SELECT
+        pr.claims_peer_z,
+        sr.max_spike_risk,
+        ps.avg_claim_amount
+    FROM provider_peer_risk pr
+    LEFT JOIN provider_spike_risk_score sr
+        ON pr.provider_id = sr.provider_id
+    LEFT JOIN provider_summary ps
+        ON pr.provider_id = ps.provider_id
+    WHERE pr.provider_id = '{provider_search}'
+    """
+
+    explain_df = pd.read_sql(explain_query, conn)
+
+    if not explain_df.empty:
+
+        st.subheader("🔎 Fraud Risk Explainability")
+
+        breakdown = pd.DataFrame({
+            "Risk Driver": [
+                "Peer Claim Outlier",
+                "Temporal Claim Spike",
+                "High Average Claim Amount"
+            ],
+            "Score": [
+                explain_df.iloc[0]["claims_peer_z"],
+                explain_df.iloc[0]["max_spike_risk"],
+                explain_df.iloc[0]["avg_claim_amount"] / 1000  # scaled for visualization
+            ]
+        })
+
+        fig_exp, ax_exp = plt.subplots(figsize=(7,4))
+
+        ax_exp.barh(
+            breakdown["Risk Driver"],
+            breakdown["Score"],
+            color="#ff7f0e"
+        )
+
+        ax_exp.set_xlabel("Risk Contribution")
+        ax_exp.set_title("Provider Fraud Risk Drivers", fontweight="bold")
+
+        ax_exp.spines["top"].set_visible(False)
+        ax_exp.spines["right"].set_visible(False)
+
+        plt.tight_layout()
+        st.pyplot(fig_exp)
 
 
 # RISK TIER BAR CHART
