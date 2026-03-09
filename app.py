@@ -12,7 +12,6 @@ sns.set_style("whitegrid")
 
 st.set_page_config(page_title="Health Claims Fraud Dashboard", layout="wide")
 
-
 # PAGE STYLE
 st.markdown("""
     <style>
@@ -21,7 +20,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🚨 Health Claims Fraud & Abuse Analytics Platform")
+st.title("Health Claims Fraud & Abuse Analytics Platform")
 st.caption("Advanced Risk Intelligence Dashboard")
 
 
@@ -294,7 +293,7 @@ color_map = {
 
 colors = [color_map[t] for t in risk_summary["risk_tier"]]
 
-fig1, ax1 = plt.subplots(figsize=(6,4))
+fig1, ax1 = plt.subplots(figsize=(4,3))
 bars = ax1.bar(risk_summary["risk_tier"], risk_summary["count"], color=colors)
 
 for bar in bars:
@@ -437,7 +436,7 @@ provider_df = pd.read_sql(provider_query, conn)
 
 # TOP 10 PROVIDERS CHART
 st.divider()
-st.subheader("🚨 Top 10 Riskiest Providers")
+st.subheader("Top 10 Riskiest Providers")
 
 top_risk_df = top_risk_df.sort_values("claims_peer_z", ascending=False).head(10)
 
@@ -465,7 +464,7 @@ st.pyplot(fig5)
 
 
 # HIGH RISK TABLE
-st.subheader("🔴 High Risk Providers Detail")
+st.subheader("High Risk Providers Detail")
 
 query = """
 SELECT betos_group, complexity_score
@@ -486,9 +485,6 @@ st.pyplot(fig, use_container_width=True)
 
 
 # BETOS Cost vs Volume (Fraud Signal)
-# - Low volume + high cost - classic abuse risk. 
-# - A real CMS fraud detection heuristic
-
 st.header("BETOS Cost vs Volume")
 
 query = """
@@ -521,9 +517,6 @@ ax.set_ylabel("Avg Cost per Service")
 st.pyplot(fig)
 
 # Provider Risk View
-# - Identifies providers with abnormally expensive behavior
-# - Foundation for fraud flags
-
 st.header("High-Risk Providers")
 
 query = """
@@ -536,7 +529,7 @@ FROM claims c
 JOIN providers p USING (provider_id)
 GROUP BY p.provider_id, p.specialty
 ORDER BY avg_claim DESC
-LIMIT 20;
+LIMIT 30;
 """
 
 df_providers = get_data(query)
