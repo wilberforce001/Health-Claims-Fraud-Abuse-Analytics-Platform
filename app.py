@@ -13,13 +13,7 @@ st.set_page_config(page_title="Health Claims Fraud Dashboard", layout="wide")
 
 ## DB connection
 def get_data(query):
-    conn = psycopg2.connect(
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        database_url=os.getenv("DATABASE_URL")
+    conn = psycopg2.connect(os.getenv("DATABASE_URL")
     )
     df = pd.read_sql(query, conn)
     conn.close()
