@@ -4,6 +4,7 @@ import psycopg2
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 plt.style.use("seaborn-v0_8-darkgrid")
 sns.set_style("whitegrid")

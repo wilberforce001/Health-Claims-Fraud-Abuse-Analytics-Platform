@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from dotenv import load_dotenv
 sns.set_style("whitegrid")
-# import plotly.graph_objects as go
+import plotly.graph_objects as go
 plt.style.use("seaborn-v0_8-darkgrid")
 
 # Load environment variables
